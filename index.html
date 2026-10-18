@@ -75,6 +75,27 @@
   #recent li::before { display: none; }
   .empty { color: var(--muted); padding: 10px 0; font-size: 14px; }
   .hidden { display: none !important; }
+  .tabs { display: flex; gap: 6px; margin-top: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 5px; }
+  .tabs button { flex: 1; background: transparent; color: var(--muted); padding: 10px; border-radius: 10px; }
+  .tabs button.on { background: var(--panel2); color: var(--text); }
+  .tabs button.admin.on { color: var(--gold); }
+  .row { border-top: 1px solid var(--line); padding: 12px 0; }
+  .row:first-child { border-top: 0; padding-top: 0; }
+  .rowhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .rowhead .name { font-weight: 600; display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .mini { width: 10px; height: 10px; border-radius: 50%; flex: none; background: #555; }
+  .mini.on { background: var(--accent); } .mini.off { background: var(--danger); }
+  .meta { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .sbtn { font-size: 13px; padding: 7px 11px; border-radius: 9px; white-space: nowrap; }
+  .sbtn.go { background: var(--accent); color: var(--accent-ink); }
+  .sbtn.stop { background: #3a2222; color: var(--danger); }
+  .sbtn.grey { background: #2a302d; color: var(--text); }
+  .sbtn.red { background: #4a2424; color: var(--danger); }
+  .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .formrow { display: flex; gap: 6px; } .formrow input { flex: 1; }
+  .ok { color: var(--accent); } .msg { min-height: 1.2em; font-size: 14px; margin-top: 8px; word-break: break-all; }
+  .totals { display: flex; gap: 14px; flex-wrap: wrap; font-size: 14px; margin-bottom: 12px; }
+  .totals b { font-family: Outfit, sans-serif; font-size: 18px; }
   .tiny { font-size: 12px; color: var(--muted); }
   @media (max-width: 420px) { .stats { grid-template-columns: repeat(3, 1fr); gap: 6px; } .stat .v { font-size: 19px; } ol.top li { grid-template-columns: 22px 40px 1fr auto; } }
 </style>
@@ -106,6 +127,12 @@
       <div class="who"><span id="whoName"></span><br><button class="ghost" id="logout">Se déconnecter</button></div>
     </header>
 
+    <div class="tabs hidden" id="tabs">
+      <button class="on" data-tab="me">☁️ Mon cloud</button>
+      <button class="admin" data-tab="admin">👑 Admin</button>
+    </div>
+
+    <div id="viewMe">
     <div class="card">
       <div class="status">
         <div class="dot" id="dot"></div>
@@ -144,6 +171,30 @@
     <div class="card">
       <h2>Dernières cartes</h2>
       <ol class="top" id="recent"></ol>
+    </div>
+
+    </div><!-- /viewMe -->
+
+    <div id="viewAdmin" class="hidden">
+      <div class="card">
+        <h2>Tous les clouds <button class="ghost" id="aRefresh">↻</button></h2>
+        <div class="totals" id="aTotals"></div>
+        <div id="aClouds"><div class="empty">Chargement…</div></div>
+        <div class="msg" id="aCloudMsg"></div>
+      </div>
+      <div class="card">
+        <h2>Créer un accès</h2>
+        <input id="nu" placeholder="Pseudo" autocapitalize="none">
+        <div class="formrow"><input id="np" placeholder="Mot de passe"><button class="sbtn grey" id="ngen" title="Générer">🎲</button></div>
+        <input id="nn" placeholder="Note (ex : pour Jens)">
+        <button class="primary" id="nadd" style="margin-top:6px;background:var(--gold)">Créer l'accès</button>
+        <div class="msg" id="nmsg"></div>
+      </div>
+      <div class="card">
+        <h2>Accès</h2>
+        <div id="aUsers"><div class="empty">Chargement…</div></div>
+        <div class="msg" id="aUserMsg"></div>
+      </div>
     </div>
 
     <div class="tiny" style="text-align:center;margin-top:16px" id="refreshed"></div>
@@ -189,15 +240,32 @@ $('loginForm').onsubmit = async (e) => {
   $('lbtn').disabled = false;
   if (r.network) return ($('lerr').textContent = 'Serveur injoignable, réessaie.');
   if (!r.ok) return ($('lerr').textContent = r.reason || 'Refusé.');
-  auth = { user: r.user, pass: p }; saveAuth(auth);
+  auth = { user: r.user, pass: p, admin: !!r.admin }; saveAuth(auth);
   startDash();
 };
 $('logout').onclick = () => { saveAuth(null); auth = null; showLogin(); };
 
 // ---------- Tableau de bord ----------
+let tab = 'me';
+function setTab(t) {
+  tab = t;
+  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
+  $('viewMe').classList.toggle('hidden', t !== 'me');
+  $('viewAdmin').classList.toggle('hidden', t !== 'admin');
+  refresh();
+}
+document.querySelectorAll('#tabs button').forEach((b) => (b.onclick = () => setTab(b.dataset.tab)));
+async function checkAdmin() {
+  const r = await rpc('wm_check_login', { p_user: auth.user, p_pass: auth.pass });
+  if (r.ok) { auth.admin = !!r.admin; saveAuth(auth); }
+  $('tabs').classList.toggle('hidden', !auth.admin);
+  if (!auth.admin && tab === 'admin') setTab('me');
+}
 function startDash() {
   $('login').classList.add('hidden'); $('dash').classList.remove('hidden');
-  $('whoName').textContent = auth.user;
+  $('whoName').textContent = auth.user + (auth.admin ? ' 👑' : '');
+  $('tabs').classList.toggle('hidden', !auth.admin);
+  checkAdmin();
   $('todayDate').textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   refresh();
   clearInterval(timer);
@@ -207,6 +275,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && au
 
 async function refresh() {
   if (busy) return;
+  if (tab === 'admin') return refreshAdmin();
   const r = await rpc('wm_cloud_get', { p_user: auth.user, p_pass: auth.pass });
   if (r.network) { $('refreshed').textContent = '⚠️ Serveur injoignable, nouvel essai…'; return; }
   if (r.ok === false) { saveAuth(null); return showLogin(r.reason === 'Identifiant refusé' ? 'Accès refusé ou désactivé, reconnecte-toi.' : r.reason); }
@@ -232,10 +301,10 @@ function render() {
       : "Le PC cloud ne s'est encore jamais connecté.";
   } else if (st.running) {
     $('stTitle').textContent = 'Ouverture en cours';
-    $('stSub').textContent = st.msg || '';
+    $('stSub').textContent = (st.wmAccount ? `Compte WikiMasters : ${st.wmAccount} · ` : '') + (st.msg || '');
   } else {
     $('stTitle').textContent = running ? 'Démarrage…' : 'En pause';
-    $('stSub').textContent = running ? "Le PC reçoit l'ordre (jusqu'à 20 s)." : 'Le PC est prêt, touche Lancer.';
+    $('stSub').textContent = (st.wmAccount ? `Compte WikiMasters : ${st.wmAccount} · ` : '') + (running ? "Le PC reçoit l'ordre (jusqu'à 20 s)." : 'Le PC est prêt, touche Lancer.');
   }
   $('sReserve').textContent = online && st.reserve ? st.reserve : '–';
   $('sOpened').textContent = online && st.opened != null ? st.opened : '–';
@@ -273,6 +342,98 @@ async function command(desired, batch) {
 }
 $('runBtn').onclick = () => command(state && state.desired === 'run' ? 'stop' : 'run', $('batch').checked);
 $('batch').onchange = () => command(state ? state.desired : 'stop', $('batch').checked);
+
+
+// ---------- Admin ----------
+const A = () => ({ p_admin: auth.user, p_admin_pass: auth.pass });
+const amsg = (id, t, ok) => { const e = $(id); e.className = 'msg ' + (ok ? 'ok' : 'err'); e.textContent = t; };
+const ago = (d) => {
+  if (!d) return 'jamais connecté';
+  const m = Math.round((Date.now() - new Date(d)) / 60000);
+  return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : new Date(d).toLocaleDateString('fr-FR');
+};
+async function refreshAdmin() {
+  const [clouds, users] = await Promise.all([rpc('wm_admin_clouds', A()), rpc('wm_admin_list', A())]);
+  if (!Array.isArray(clouds)) {
+    $('aClouds').innerHTML = `<div class="empty">${esc(clouds.network ? 'Serveur injoignable.' : clouds.reason || 'Accès admin refusé.')}</div>`;
+    return;
+  }
+  // Clouds
+  const online = clouds.filter((c) => c.online).length, running = clouds.filter((c) => c.online && c.status && c.status.running).length;
+  const totV = clouds.reduce((s, c) => s + Number(c.today_value || 0), 0), totC = clouds.reduce((s, c) => s + Number(c.today_cards || 0), 0);
+  $('aTotals').innerHTML = `<span><b>${online}</b> PC en ligne</span><span><b>${running}</b> en cours</span><span><b>${fr(totC)}</b> cartes</span><span><b style="color:var(--accent)">≈ ${fr(totV)}</b> aujourd'hui</span>`;
+  $('aClouds').innerHTML = clouds.map((c) => {
+    const st = c.status || {}, run = c.desired === 'run';
+    const etat = !c.online ? 'hors ligne · ' + ago(c.seen_at) : st.running ? 'ouverture en cours' : run ? 'démarrage…' : 'en pause';
+    return `<div class="row">
+      <div class="rowhead">
+        <span class="name"><span class="mini ${c.online ? 'on' : 'off'}"></span>${esc(c.user)}${c.admin ? ' 👑' : ''}${c.active ? '' : ' <span class="err" style="font-size:12px">(coupé)</span>'}</span>
+        <button class="sbtn ${run ? 'stop' : 'go'}" data-cmd="${run ? 'stop' : 'run'}" data-u="${esc(c.user)}" data-b="${c.batch ? 1 : 0}">${run ? '■ Arrêter' : '▶ Lancer'}</button>
+      </div>
+      <div class="meta">${esc(etat)}${c.online && st.reserve ? ` · réserve ${esc(st.reserve)}` : ''} · ${c.batch ? '10 par 10' : 'continu'}</div>
+      <div class="meta">Compte WikiMasters : <b style="color:var(--text)">${st.wmAccount ? esc(st.wmAccount) : '?'}</b></div>
+      <div class="meta">Aujourd'hui : ${fr(c.today_cards)} cartes · <span class="ok">≈ ${fr(c.today_value)}</span>${c.best ? ` · meilleure : <span style="${rarStyle(c.best.rarity)};padding:0 5px;border-radius:5px">${esc(c.best.rarity)}</span> ${esc(c.best.title)} (~${fr(c.best.value)})` : ''}</div>
+    </div>`;
+  }).join('') || '<div class="empty">Aucun accès.</div>';
+  document.querySelectorAll('#aClouds [data-cmd]').forEach((b) => (b.onclick = async () => {
+    b.disabled = true;
+    const r = await rpc('wm_admin_cloud_command', { ...A(), p_user: b.dataset.u, p_desired: b.dataset.cmd, p_batch: b.dataset.b === '1' });
+    if (!r.ok) amsg('aCloudMsg', r.network ? 'Serveur injoignable.' : r.reason, false);
+    else amsg('aCloudMsg', `Ordre envoyé à ${b.dataset.u} (appliqué sous 20 s).`, true);
+    refreshAdmin();
+  }));
+
+  // Accès
+  if (Array.isArray(users)) {
+    const list = users.filter((u) => !u.admin);
+    $('aUsers').innerHTML = list.map((u) => `<div class="row">
+        <div class="rowhead"><span class="name">${esc(u.user)} ${u.active ? '<span class="ok">●</span>' : '<span class="err">● coupé</span>'}${u.locked ? ' 🔒' : ''}</span></div>
+        <div class="meta">${u.note ? esc(u.note) + ' · ' : ''}${u.uses} connexion(s) · dernière : ${ago(u.last)}</div>
+        <div class="btns">
+          <button class="sbtn grey" data-a="toggle" data-u="${esc(u.user)}" data-v="${u.active ? 0 : 1}">${u.active ? 'Couper' : 'Rétablir'}</button>
+          <button class="sbtn grey" data-a="pass" data-u="${esc(u.user)}">Nouveau mot de passe</button>
+          <button class="sbtn red" data-a="del" data-u="${esc(u.user)}">Supprimer</button>
+        </div></div>`).join('') || '<div class="empty">Aucun accès créé pour l\'instant.</div>';
+    document.querySelectorAll('#aUsers [data-a]').forEach((b) => (b.onclick = () => userAction(b.dataset.a, b.dataset.u, b.dataset.v)));
+  }
+  $('refreshed').textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR');
+}
+function genPass() {
+  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const a = new Uint32Array(10); crypto.getRandomValues(a);
+  return [...a].map((n) => chars[n % chars.length]).join('');
+}
+async function userAction(action, user, v) {
+  let r;
+  if (action === 'toggle') {
+    r = await rpc('wm_admin_set_active', { ...A(), p_user: user, p_active: v === '1' });
+    if (r.ok) amsg('aUserMsg', v === '1' ? `Accès rétabli pour ${user}.` : `Accès coupé pour ${user}.`, true);
+  } else if (action === 'pass') {
+    const np = prompt(`Nouveau mot de passe pour ${user} (6 caractères min.) :`, genPass());
+    if (!np) return;
+    r = await rpc('wm_admin_set_password', { ...A(), p_user: user, p_pass: np });
+    if (r.ok) amsg('aUserMsg', `Nouveau mot de passe de ${user} : ${np}`, true);
+  } else if (action === 'del') {
+    if (!confirm(`Supprimer l'accès de ${user} ? Il ne pourra plus se connecter.`)) return;
+    r = await rpc('wm_admin_remove', { ...A(), p_user: user });
+    if (r.ok) amsg('aUserMsg', `Accès de ${user} supprimé.`, true);
+  }
+  if (r && !r.ok) amsg('aUserMsg', r.network ? 'Serveur injoignable.' : (r.reason || 'Action refusée.'), false);
+  refreshAdmin();
+}
+$('ngen').onclick = () => { $('np').value = genPass(); };
+$('nadd').onclick = async () => {
+  const u = $('nu').value.trim(), p = $('np').value, n = $('nn').value.trim();
+  if (!u || !p) return amsg('nmsg', 'Pseudo et mot de passe obligatoires.', false);
+  $('nadd').disabled = true;
+  const r = await rpc('wm_admin_add', { ...A(), p_user: u, p_pass: p, p_note: n || null });
+  $('nadd').disabled = false;
+  if (!r.ok) return amsg('nmsg', r.network ? 'Serveur injoignable.' : (r.reason || 'Refusé.'), false);
+  amsg('nmsg', `✅ Accès créé — pseudo : ${u.toLowerCase()} · mot de passe : ${p}`, true);
+  $('nu').value = ''; $('np').value = ''; $('nn').value = '';
+  refreshAdmin();
+};
+$('aRefresh').onclick = () => refreshAdmin();
 
 // ---------- Démarrage ----------
 auth = loadAuth();

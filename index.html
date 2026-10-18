@@ -293,8 +293,12 @@ function rowHTML(c, showTime) {
 function render() {
   const s = state, st = s.status || {};
   const online = s.agent_online, running = s.desired === 'run';
-  $('dot').className = 'dot ' + (online ? 'on' : 'off');
-  if (!online) {
+  const ready = !online && s.launcher_online;
+  $('dot').className = 'dot ' + (online ? 'on' : ready ? '' : 'off');
+  if (ready) {
+    $('stTitle').textContent = running ? 'Ouverture de la fenêtre…' : 'Prêt';
+    $('stSub').textContent = running ? 'Le PC ouvre ta fenêtre WikiMasters (jusqu\'à 30 s).' : 'Le PC cloud est allumé. Touche Lancer pour démarrer.';
+  } else if (!online) {
     $('stTitle').textContent = 'PC hors ligne';
     $('stSub').textContent = s.agent_seen_at
       ? 'Dernier signal : ' + new Date(s.agent_seen_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -317,7 +321,8 @@ function render() {
   $('batch').checked = !!s.batch;
 
   const hints = [];
-  if (!online) hints.push("Sur le PC : onglet WikiMasters ouvert, connecté aux outils, case « Ce PC est le cloud de mon compte » cochée.");
+  if (!online && !s.launcher_online) hints.push("Le PC cloud est éteint ou son lanceur est arrêté.");
+  else if (ready && running) hints.push("Si rien ne se passe après 1 minute, ton profil n'est peut-être pas encore préparé sur le PC.");
   else if (st.onPacksPage === false) hints.push('Le PC n\'est pas sur la page « Paquets » : il y ira tout seul au lancement.');
   $('hint').textContent = hints.join(' ');
 
@@ -353,7 +358,7 @@ const ago = (d) => {
   return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : new Date(d).toLocaleDateString('fr-FR');
 };
 async function refreshAdmin() {
-  const [clouds, users] = await Promise.all([rpc('wm_admin_clouds', A()), rpc('wm_admin_list', A())]);
+  const [clouds, users, launcher] = await Promise.all([rpc('wm_admin_clouds', A()), rpc('wm_admin_list', A()), rpc('wm_admin_launcher', A())]);
   if (!Array.isArray(clouds)) {
     $('aClouds').innerHTML = `<div class="empty">${esc(clouds.network ? 'Serveur injoignable.' : clouds.reason || 'Accès admin refusé.')}</div>`;
     return;
@@ -361,13 +366,14 @@ async function refreshAdmin() {
   // Clouds
   const online = clouds.filter((c) => c.online).length, running = clouds.filter((c) => c.online && c.status && c.status.running).length;
   const totV = clouds.reduce((s, c) => s + Number(c.today_value || 0), 0), totC = clouds.reduce((s, c) => s + Number(c.today_cards || 0), 0);
-  $('aTotals').innerHTML = `<span><b>${online}</b> PC en ligne</span><span><b>${running}</b> en cours</span><span><b>${fr(totC)}</b> cartes</span><span><b style="color:var(--accent)">≈ ${fr(totV)}</b> aujourd'hui</span>`;
+  const lOn = launcher && launcher.online;
+  $('aTotals').innerHTML = `<span><span class="mini ${lOn ? 'on' : 'off'}" style="display:inline-block;margin-right:5px"></span><b>Lanceur</b> ${lOn ? 'en ligne' : 'arrêté · ' + ago(launcher && launcher.seen_at)}</span><span><b>${online}</b> PC en ligne</span><span><b>${running}</b> en cours</span><span><b>${fr(totC)}</b> cartes</span><span><b style="color:var(--accent)">≈ ${fr(totV)}</b> aujourd'hui</span>`;
   $('aClouds').innerHTML = clouds.map((c) => {
     const st = c.status || {}, run = c.desired === 'run';
-    const etat = !c.online ? 'hors ligne · ' + ago(c.seen_at) : st.running ? 'ouverture en cours' : run ? 'démarrage…' : 'en pause';
+    const etat = !c.online ? (lOn ? (run ? 'ouverture de la fenêtre…' : 'prêt (fenêtre fermée)') : 'hors ligne · ' + ago(c.seen_at)) : st.running ? 'ouverture en cours' : run ? 'démarrage…' : 'en pause';
     return `<div class="row">
       <div class="rowhead">
-        <span class="name"><span class="mini ${c.online ? 'on' : 'off'}"></span>${esc(c.user)}${c.admin ? ' 👑' : ''}${c.active ? '' : ' <span class="err" style="font-size:12px">(coupé)</span>'}</span>
+        <span class="name"><span class="mini ${c.online ? 'on' : lOn ? '' : 'off'}"></span>${esc(c.user)}${c.admin ? ' 👑' : ''}${c.active ? '' : ' <span class="err" style="font-size:12px">(coupé)</span>'}</span>
         <button class="sbtn ${run ? 'stop' : 'go'}" data-cmd="${run ? 'stop' : 'run'}" data-u="${esc(c.user)}" data-b="${c.batch ? 1 : 0}">${run ? '■ Arrêter' : '▶ Lancer'}</button>
       </div>
       <div class="meta">${esc(etat)}${c.online && st.reserve ? ` · réserve ${esc(st.reserve)}` : ''} · ${c.batch ? '10 par 10' : 'continu'}</div>

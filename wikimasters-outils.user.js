@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WikiMasters – Outils (packs auto, défausse, analyse, vente)
 // @namespace    remi.wikimasters
-// @version      4.3
+// @version      4.4
 // @description  Ouverture auto des packs + défausse par rareté + analyse + vente. Accès par identifiant.
 // @match        https://www.wiki-masters.com/*
 // @match        https://wiki-masters.com/*
@@ -38,7 +38,7 @@
   const gmDel = async (k) => {
     try { return typeof GM_deleteValue === 'function' ? GM_deleteValue(k) : await G.deleteValue(k); } catch (e) {}
   };
-  const isMobile = () => window.matchMedia('(max-width: 600px), (pointer: coarse)').matches;
+  const isMobile = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
   // Taille du panneau adaptée à l'écran (téléphone compris).
   const CLOUD_URL = 'https://remsko.github.io/wikimasters-cloud/';
   const PANEL_POS = 'position:fixed;left:12px;top:12px;z-index:999999;max-width:calc(100vw - 24px);box-sizing:border-box;';
@@ -630,14 +630,30 @@ ${isAdmin ? `
   $('wm-cloud').onclick = $('wm-cloud-open').onclick = () => window.open(CLOUD_URL, '_blank');
   let agentMode = false;
   try { agentMode = localStorage.getItem('wm-agent') === '1'; } catch (e) {}
+  // Identifiant unique de cet appareil / profil (un seul appareil à la fois peut être le cloud d'un compte).
+  let agentId = null;
+  try { agentId = localStorage.getItem('wm-agent-id'); } catch (e) {}
+  if (!agentId) {
+    const a = new Uint32Array(4); crypto.getRandomValues(a);
+    agentId = 'dev-' + [...a].map((n) => n.toString(36)).join('');
+    try { localStorage.setItem('wm-agent-id', agentId); } catch (e) {}
+  }
+  // Sur téléphone, la page se met en pause dès que l'écran s'éteint : pas de cloud possible.
+  const phone = isMobile();
+  if (phone) {
+    agentMode = false;
+    $('wm-agent').disabled = true;
+    $('wm-agent').parentElement.style.opacity = '.5';
+    setTimeout(() => agentSt('📱 Sur téléphone, le cloud ne peut pas tourner (la page se met en pause). Il doit être sur un ordinateur allumé. Utilise « Ouvrir le site cloud » pour piloter.'), 0);
+  }
   // Fenêtre ouverte par le lanceur (lien avec ?wmcloud=1) : le mode cloud s'active tout seul.
-  if (new URLSearchParams(location.search).get('wmcloud') === '1') {
+  if (!phone && new URLSearchParams(location.search).get('wmcloud') === '1') {
     agentMode = true;
     try { localStorage.setItem('wm-agent', '1'); } catch (e) {}
   }
-  $('wm-agent').checked = agentMode;
   let cloudAuth = {};
   const agentSt = (t) => { $('wm-agent-st').textContent = t; };
+  $('wm-agent').checked = agentMode;
 
   // Valeur des cartes : prix médian de la rareté, et dernier prix réel pour les UR / L.
   let medCache = null, medAt = 0;
@@ -706,6 +722,7 @@ ${isAdmin ? `
     return wmAccount;
   }
 
+  let cloudStarted = false;
   async function agentTick() {
     if (!agentMode || !cloudAuth.user) return;
     const c = packCount();
@@ -716,7 +733,13 @@ ${isAdmin ? `
       onPacksPage: location.pathname.startsWith('/pulls'),
       msg: $('wm-pack-status').textContent.slice(0, 120),
     };
-    const r = await rpc('wm_agent_sync', { p_user: cloudAuth.user, p_pass: cloudAuth.pass, p_status: status });
+    const r = await rpc('wm_agent_sync2', { p_user: cloudAuth.user, p_pass: cloudAuth.pass, p_status: status, p_agent_id: agentId });
+    if (r.busy) {
+      // Un autre appareil pilote déjà ce compte : celui-ci ne fait rien.
+      if (packsRunning && cloudStarted) { setRunning(false, true); cloudStarted = false; }
+      agentSt('⛔ Un autre appareil est déjà le cloud de ce compte. Décoche la case ici, ou ferme l\'autre.');
+      return;
+    }
     if (!r.ok) { agentSt(r.network ? '⚠️ Serveur injoignable, nouvel essai dans 20 s.' : '⚠️ ' + (r.reason || 'Refusé.')); return; }
     if (typeof r.batch === 'boolean' && r.batch !== batchMode) {
       batchMode = r.batch; $('wm-batch').checked = batchMode;
@@ -724,7 +747,7 @@ ${isAdmin ? `
     }
     if (reportedUpTo < pulled.length) cloudReportPulls();
     if (r.desired === 'run' && !location.pathname.startsWith('/pulls')) { location.href = '/pulls'; return; }
-    if (r.desired === 'run' && !packsRunning) setRunning(true, true);
+    if (r.desired === 'run' && !packsRunning) { setRunning(true, true); cloudStarted = true; }
     if (r.desired === 'stop' && packsRunning) { setRunning(false, true); cloudReportPulls(); }
     agentSt(`🟢 Cloud actif · ordre : ${r.desired === 'run' ? 'ouvrir' : 'arrêt'} · ${new Date().toLocaleTimeString('fr-FR')}`);
   }
@@ -734,6 +757,7 @@ ${isAdmin ? `
     try { localStorage.setItem('wm-agent', agentMode ? '1' : '0'); } catch (e) {}
     agentSt(agentMode ? 'Connexion au cloud…' : 'Cloud désactivé sur ce PC.');
     if (agentMode) agentTick();
+    else if (cloudStarted && packsRunning) { setRunning(false, true); cloudStarted = false; }
   };
   gmGet('wm_auth', {}).then((a) => {
     cloudAuth = a || {};

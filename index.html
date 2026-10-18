@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d100f">
+<title>WikiMasters Cloud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d100f; --panel: #151918; --panel2: #1b201e; --line: #262c29;
+    --text: #e8f5ee; --muted: #8fa198; --accent: #2fd08a; --accent-ink: #08130d;
+    --danger: #ff7a7a; --gold: #e8b730;
+    --L: #e8b730; --UR: #e0603a; --SR: #a777d6; --R: #5aa0e0; --PC: #e07ab0; --C: #7f9a8c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 Inter, system-ui, sans-serif; }
+  body { min-height: 100vh; padding: max(16px, env(safe-area-inset-top)) 16px 40px; }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1, h2, .big { font-family: Outfit, Inter, sans-serif; }
+  .logo { font-family: Outfit, sans-serif; font-weight: 800; font-size: 26px; letter-spacing: -.5px; }
+  .logo b { color: var(--accent); }
+  .muted { color: var(--muted); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin-top: 14px; }
+  .card h2 { margin: 0 0 12px; font-size: 17px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 16px; margin: 6px 0; }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button { font: 600 15px Inter, sans-serif; border: 0; border-radius: 12px; padding: 13px 16px; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .primary { background: var(--accent); color: var(--accent-ink); width: 100%; }
+  .ghost { background: transparent; color: var(--muted); padding: 6px 10px; font-weight: 500; }
+  .err { color: var(--danger); min-height: 1.2em; margin-top: 8px; font-size: 14px; }
+
+  header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .who { font-size: 13px; color: var(--muted); text-align: right; }
+
+  .status { display: flex; align-items: center; gap: 14px; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; background: #555; box-shadow: 0 0 0 4px #5552; }
+  .dot.on { background: var(--accent); box-shadow: 0 0 0 4px #2fd08a33; animation: pulse 2s infinite; }
+  .dot.off { background: var(--danger); box-shadow: 0 0 0 4px #ff7a7a22; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 8px #2fd08a11; } }
+  .status .big { font-size: 20px; font-weight: 700; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+  .stat { background: var(--panel2); border-radius: 12px; padding: 10px 12px; }
+  .stat .k { font-size: 12px; color: var(--muted); }
+  .stat .v { font-family: Outfit, sans-serif; font-size: 22px; font-weight: 700; }
+
+  .run { font-size: 18px; padding: 18px; width: 100%; margin-top: 14px; font-family: Outfit, sans-serif; letter-spacing: .2px; }
+  .run.go { background: var(--accent); color: var(--accent-ink); }
+  .run.stop { background: #3a2222; color: var(--danger); border: 1px solid #5a2f2f; }
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; cursor: pointer; }
+  .switch input { display: none; }
+  .track { width: 48px; height: 28px; border-radius: 14px; background: #333; position: relative; flex: none; transition: .2s; }
+  .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: .2s; }
+  .switch input:checked + .track { background: var(--accent); }
+  .switch input:checked + .track::after { left: 23px; }
+  .note { font-size: 13px; color: var(--muted); margin-top: 10px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .chip { padding: 3px 10px; border-radius: 20px; font-weight: 600; font-size: 13px; }
+
+  ol.top { list-style: none; margin: 0; padding: 0; counter-reset: n; }
+  ol.top li { counter-increment: n; display: grid; grid-template-columns: 28px 44px 1fr auto; align-items: center; gap: 8px;
+              padding: 10px 0; border-top: 1px solid var(--line); }
+  ol.top li:first-child { border-top: 0; }
+  ol.top li::before { content: counter(n); color: var(--muted); font-family: Outfit, sans-serif; font-weight: 700; text-align: center; }
+  ol.top li:nth-child(1)::before { color: var(--gold); }
+  .rar { font-family: Outfit, sans-serif; font-weight: 800; font-size: 13px; text-align: center; border-radius: 8px; padding: 3px 0; }
+  .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .val { font-family: Outfit, sans-serif; font-weight: 700; white-space: nowrap; }
+  .val small { color: var(--muted); font-weight: 500; font-family: Inter; font-size: 11px; display: block; text-align: right; }
+  #recent li { grid-template-columns: 44px 1fr auto; }
+  #recent li::before { display: none; }
+  .empty { color: var(--muted); padding: 10px 0; font-size: 14px; }
+  .hidden { display: none !important; }
+  .tiny { font-size: 12px; color: var(--muted); }
+  @media (max-width: 420px) { .stats { grid-template-columns: repeat(3, 1fr); gap: 6px; } .stat .v { font-size: 19px; } ol.top li { grid-template-columns: 22px 40px 1fr auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Connexion -->
+  <section id="login" class="hidden">
+    <div style="text-align:center;margin:8vh 0 18px">
+      <div class="logo">☁️ Wiki<b>Masters</b> Cloud</div>
+      <div class="muted" style="margin-top:6px">Pilote l'ouverture de tes packs à distance.</div>
+    </div>
+    <div class="card" style="max-width:380px;margin:0 auto">
+      <form id="loginForm" autocomplete="on">
+        <input id="lu" placeholder="Identifiant" autocomplete="username" autocapitalize="none" required>
+        <input id="lp" type="password" placeholder="Mot de passe" autocomplete="current-password" required>
+        <button class="primary" id="lbtn" style="margin-top:8px">Se connecter</button>
+        <div class="err" id="lerr"></div>
+      </form>
+      <div class="tiny" style="margin-top:6px">Mêmes identifiants que l'outil WikiMasters.</div>
+    </div>
+  </section>
+
+  <!-- Tableau de bord -->
+  <section id="dash" class="hidden">
+    <header>
+      <div class="logo">☁️ Wiki<b>Masters</b></div>
+      <div class="who"><span id="whoName"></span><br><button class="ghost" id="logout">Se déconnecter</button></div>
+    </header>
+
+    <div class="card">
+      <div class="status">
+        <div class="dot" id="dot"></div>
+        <div style="flex:1">
+          <div class="big" id="stTitle">Chargement…</div>
+          <div class="muted" id="stSub" style="font-size:14px"></div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="k">Réserve</div><div class="v" id="sReserve">–</div></div>
+        <div class="stat"><div class="k">Packs (session)</div><div class="v" id="sOpened">–</div></div>
+        <div class="stat"><div class="k">Mode</div><div class="v" id="sMode" style="font-size:17px">–</div></div>
+      </div>
+      <button class="run go" id="runBtn" disabled>▶ Lancer l'ouverture</button>
+      <label class="switch">
+        <span><b>10 par 10</b><br><span class="tiny">Attendre d'avoir 10 paquets puis tout ouvrir</span></span>
+        <input type="checkbox" id="batch"><span class="track"></span>
+      </label>
+      <div class="note" id="hint"></div>
+    </div>
+
+    <div class="card">
+      <h2>Aujourd'hui <span class="muted" style="font-size:13px;font-weight:500" id="todayDate"></span></h2>
+      <div class="stats" style="margin-top:0">
+        <div class="stat"><div class="k">Cartes</div><div class="v" id="tCards">0</div></div>
+        <div class="stat" style="grid-column: span 2"><div class="k">Valeur estimée</div><div class="v" id="tValue" style="color:var(--accent)">0</div></div>
+      </div>
+      <div class="chips" id="tChips"></div>
+    </div>
+
+    <div class="card">
+      <h2>🏆 Top 10 du jour</h2>
+      <ol class="top" id="top10"></ol>
+    </div>
+
+    <div class="card">
+      <h2>Dernières cartes</h2>
+      <ol class="top" id="recent"></ol>
+    </div>
+
+    <div class="tiny" style="text-align:center;margin-top:16px" id="refreshed"></div>
+  </section>
+</div>
+
+<script>
+// Réglages : adresse et clé publique de la base (la clé publique ne permet que d'appeler les fonctions prévues).
+const API = 'https://djqiebvxomunucoxaslv.supabase.co/rest/v1/rpc/';
+const KEY = 'sb_publishable_7DMTebFuGdNRz-61SmWdzA_rydnA9_8';
+const RAR = { L: 'Légendaire', UR: 'UR', SR: 'SR', R: 'Rare', PC: 'PC', C: 'Commune' };
+const ORDER = ['L', 'UR', 'SR', 'R', 'PC', 'C'];
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fr = (n) => Number(n || 0).toLocaleString('fr-FR');
+let auth = null, state = null, timer = null, busy = false;
+
+function loadAuth() { try { return JSON.parse(localStorage.getItem('wmc-auth')); } catch (e) { return null; } }
+function saveAuth(a) { try { a ? localStorage.setItem('wmc-auth', JSON.stringify(a)) : localStorage.removeItem('wmc-auth'); } catch (e) {} }
+
+async function rpc(name, args) {
+  let r;
+  try {
+    r = await fetch(API + name, { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
+  } catch (e) { return { ok: false, network: true }; }
+  let d = null; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) return { ok: false, reason: (d && d.message) || 'Erreur du serveur.' };
+  return d;
+}
+
+// ---------- Connexion ----------
+function showLogin(msg) {
+  clearInterval(timer);
+  $('dash').classList.add('hidden'); $('login').classList.remove('hidden');
+  $('lerr').textContent = msg || '';
+}
+$('loginForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const u = $('lu').value.trim(), p = $('lp').value;
+  $('lbtn').disabled = true; $('lerr').textContent = '';
+  const r = await rpc('wm_check_login', { p_user: u, p_pass: p });
+  $('lbtn').disabled = false;
+  if (r.network) return ($('lerr').textContent = 'Serveur injoignable, réessaie.');
+  if (!r.ok) return ($('lerr').textContent = r.reason || 'Refusé.');
+  auth = { user: r.user, pass: p }; saveAuth(auth);
+  startDash();
+};
+$('logout').onclick = () => { saveAuth(null); auth = null; showLogin(); };
+
+// ---------- Tableau de bord ----------
+function startDash() {
+  $('login').classList.add('hidden'); $('dash').classList.remove('hidden');
+  $('whoName').textContent = auth.user;
+  $('todayDate').textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  refresh();
+  clearInterval(timer);
+  timer = setInterval(() => { if (!document.hidden) refresh(); }, 8000);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && auth) refresh(); });
+
+async function refresh() {
+  if (busy) return;
+  const r = await rpc('wm_cloud_get', { p_user: auth.user, p_pass: auth.pass });
+  if (r.network) { $('refreshed').textContent = '⚠️ Serveur injoignable, nouvel essai…'; return; }
+  if (r.ok === false) { saveAuth(null); return showLogin(r.reason === 'Identifiant refusé' ? 'Accès refusé ou désactivé, reconnecte-toi.' : r.reason); }
+  state = r; render();
+  $('refreshed').textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR');
+}
+
+function rarStyle(r) { const c = getComputedStyle(document.documentElement).getPropertyValue('--' + r).trim() || '#888'; return `background:${c}26;color:${c}`; }
+function rowHTML(c, showTime) {
+  const t = showTime ? new Date(c.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+  return `<li><span class="rar" style="${rarStyle(c.rarity)}">${esc(c.rarity)}</span><span class="title">${esc(c.title)}</span>
+          <span class="val">~${fr(c.value)}${t ? `<small>${t}</small>` : ''}</span></li>`;
+}
+
+function render() {
+  const s = state, st = s.status || {};
+  const online = s.agent_online, running = s.desired === 'run';
+  $('dot').className = 'dot ' + (online ? 'on' : 'off');
+  if (!online) {
+    $('stTitle').textContent = 'PC hors ligne';
+    $('stSub').textContent = s.agent_seen_at
+      ? 'Dernier signal : ' + new Date(s.agent_seen_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+      : "Le PC cloud ne s'est encore jamais connecté.";
+  } else if (st.running) {
+    $('stTitle').textContent = 'Ouverture en cours';
+    $('stSub').textContent = st.msg || '';
+  } else {
+    $('stTitle').textContent = running ? 'Démarrage…' : 'En pause';
+    $('stSub').textContent = running ? "Le PC reçoit l'ordre (jusqu'à 20 s)." : 'Le PC est prêt, touche Lancer.';
+  }
+  $('sReserve').textContent = online && st.reserve ? st.reserve : '–';
+  $('sOpened').textContent = online && st.opened != null ? st.opened : '–';
+  $('sMode').textContent = s.batch ? '10 par 10' : 'Continu';
+
+  const b = $('runBtn');
+  b.disabled = false;
+  b.className = 'run ' + (running ? 'stop' : 'go');
+  b.textContent = running ? "■ Arrêter l'ouverture" : "▶ Lancer l'ouverture";
+  $('batch').checked = !!s.batch;
+
+  const hints = [];
+  if (!online) hints.push("Sur le PC : onglet WikiMasters ouvert, connecté aux outils, case « Ce PC est le cloud de mon compte » cochée.");
+  else if (st.onPacksPage === false) hints.push('Le PC n\'est pas sur la page « Paquets » : il y ira tout seul au lancement.');
+  $('hint').textContent = hints.join(' ');
+
+  const td = s.today || {};
+  $('tCards').textContent = fr(td.cards);
+  $('tValue').textContent = '≈ ' + fr(td.value);
+  const by = td.by_rarity || {};
+  $('tChips').innerHTML = ORDER.filter((r) => by[r]).map((r) => `<span class="chip" style="${rarStyle(r)}">${r} × ${by[r]}</span>`).join('');
+
+  $('top10').innerHTML = (s.top10 || []).length ? s.top10.map((c) => rowHTML(c, false)).join('')
+    : '<div class="empty">Aucune carte ouverte par le cloud aujourd\'hui.</div>';
+  $('recent').innerHTML = (s.recent || []).length ? s.recent.map((c) => rowHTML(c, true)).join('')
+    : '<div class="empty">Rien pour l\'instant.</div>';
+}
+
+async function command(desired, batch) {
+  busy = true; $('runBtn').disabled = true;
+  const r = await rpc('wm_cloud_command', { p_user: auth.user, p_pass: auth.pass, p_desired: desired, p_batch: batch });
+  busy = false;
+  if (r.ok === false) { $('hint').textContent = '⚠️ ' + (r.network ? 'Serveur injoignable.' : r.reason); $('runBtn').disabled = false; return; }
+  refresh();
+}
+$('runBtn').onclick = () => command(state && state.desired === 'run' ? 'stop' : 'run', $('batch').checked);
+$('batch').onchange = () => command(state ? state.desired : 'stop', $('batch').checked);
+
+// ---------- Démarrage ----------
+auth = loadAuth();
+auth ? startDash() : showLogin();
+</script>
+</body>
+</html>

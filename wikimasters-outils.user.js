@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WikiMasters – Outils (packs auto, défausse, analyse, vente)
 // @namespace    remi.wikimasters
-// @version      4.4
+// @version      4.5
 // @description  Ouverture auto des packs + défausse par rareté + analyse + vente. Accès par identifiant.
 // @match        https://www.wiki-masters.com/*
 // @match        https://wiki-masters.com/*
@@ -649,8 +649,12 @@ ${isAdmin ? `
   // Fenêtre ouverte par le lanceur (lien avec ?wmcloud=1) : le mode cloud s'active tout seul.
   if (!phone && new URLSearchParams(location.search).get('wmcloud') === '1') {
     agentMode = true;
-    try { localStorage.setItem('wm-agent', '1'); } catch (e) {}
+    try { localStorage.setItem('wm-agent', '1'); localStorage.setItem('wm-kind', 'cloud'); } catch (e) {}
   }
+  // Type d'appareil : « cloud » = fenêtre du PC cloud ouverte par le lanceur ; « perso » = le PC de la personne.
+  let agentKind = 'perso';
+  try { agentKind = localStorage.getItem('wm-kind') === 'cloud' ? 'cloud' : 'perso'; } catch (e) {}
+  const kindName = agentKind === 'cloud' ? 'PC cloud' : 'Mon PC';
   let cloudAuth = {};
   const agentSt = (t) => { $('wm-agent-st').textContent = t; };
   $('wm-agent').checked = agentMode;
@@ -733,7 +737,7 @@ ${isAdmin ? `
       onPacksPage: location.pathname.startsWith('/pulls'),
       msg: $('wm-pack-status').textContent.slice(0, 120),
     };
-    const r = await rpc('wm_agent_sync2', { p_user: cloudAuth.user, p_pass: cloudAuth.pass, p_status: status, p_agent_id: agentId });
+    const r = await rpc('wm_agent_sync3', { p_user: cloudAuth.user, p_pass: cloudAuth.pass, p_status: status, p_agent_id: agentId, p_kind: agentKind });
     if (r.busy) {
       // Un autre appareil pilote déjà ce compte : celui-ci ne fait rien.
       if (packsRunning && cloudStarted) { setRunning(false, true); cloudStarted = false; }
@@ -741,6 +745,12 @@ ${isAdmin ? `
       return;
     }
     if (!r.ok) { agentSt(r.network ? '⚠️ Serveur injoignable, nouvel essai dans 20 s.' : '⚠️ ' + (r.reason || 'Refusé.')); return; }
+    if (r.role === 'standby') {
+      // Ce n'est pas l'appareil choisi : on ne fait rien (et on s'arrête si on tournait pour le cloud).
+      if (packsRunning && cloudStarted) { setRunning(false, true); cloudStarted = false; cloudReportPulls(); }
+      agentSt(`💤 ${kindName} en veille · ${r.reason || ''} · ${new Date().toLocaleTimeString('fr-FR')}`);
+      return;
+    }
     if (typeof r.batch === 'boolean' && r.batch !== batchMode) {
       batchMode = r.batch; $('wm-batch').checked = batchMode;
       try { localStorage.setItem('wm-batch', batchMode ? '1' : '0'); } catch (e) {}
@@ -749,7 +759,7 @@ ${isAdmin ? `
     if (r.desired === 'run' && !location.pathname.startsWith('/pulls')) { location.href = '/pulls'; return; }
     if (r.desired === 'run' && !packsRunning) { setRunning(true, true); cloudStarted = true; }
     if (r.desired === 'stop' && packsRunning) { setRunning(false, true); cloudReportPulls(); }
-    agentSt(`🟢 Cloud actif · ordre : ${r.desired === 'run' ? 'ouvrir' : 'arrêt'} · ${new Date().toLocaleTimeString('fr-FR')}`);
+    agentSt(`🟢 ${kindName} actif · ordre : ${r.desired === 'run' ? 'ouvrir' : 'arrêt'} · ${new Date().toLocaleTimeString('fr-FR')}`);
   }
 
   $('wm-agent').onchange = () => {

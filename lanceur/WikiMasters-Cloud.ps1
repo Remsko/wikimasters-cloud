@@ -168,7 +168,10 @@ function Run-Loop {
       $s = $state[$u]
       $open = Is-Open $u
 
-      if ($p.desired -eq 'run') {
+      # open_cloud : le PC cloud doit ouvrir les packs (et pas « Mon PC » de la personne).
+      $want = $p.desired -eq 'run'
+      if ($null -ne $p.open_cloud) { $want = [bool]$p.open_cloud }
+      if ($want) {
         $s.stopAt = $null
         if (-not $open) {
           if (-not (Profile-Ready $u)) {
@@ -185,7 +188,11 @@ function Run-Loop {
         }
       } else {
         if ($open -and $s.opened) {
-          if (-not $s.stopAt) { $s.stopAt = Get-Date; Say "[] $u : arrêt demandé, envoi des dernières cartes…" Cyan }
+          if (-not $s.stopAt) {
+            $s.stopAt = Get-Date
+            if ($p.desired -eq 'run') { Say "[] $u : son propre PC a repris la main, envoi des dernières cartes…" Cyan }
+            else { Say "[] $u : arrêt demandé, envoi des dernières cartes…" Cyan }
+          }
           $waited = ((Get-Date) - $s.stopAt).TotalSeconds
           if ((-not $p.running -and $waited -ge 15) -or $waited -ge $STOP_GRACE) {
             Say "[] $u : fermeture de sa fenêtre." Cyan

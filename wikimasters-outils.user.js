@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WikiMasters – Outils (packs auto, défausse, analyse, vente)
 // @namespace    remi.wikimasters
-// @version      4.2
+// @version      4.3
 // @description  Ouverture auto des packs + défausse par rareté + analyse + vente. Accès par identifiant.
 // @match        https://www.wiki-masters.com/*
 // @match        https://wiki-masters.com/*
@@ -659,15 +659,21 @@ ${isAdmin ? `
   }
 
   // Envoie les nouvelles cartes sorties au cloud.
+  let reportInFlight = false;
   window.cloudReportPulls = async function () {
     if (!agentMode || !cloudAuth.user) return;
-    const fresh = pulled.slice(reportedUpTo);
+    if (reportInFlight) return;
+    const upTo = Math.min(pulled.length, reportedUpTo + 50);
+    const fresh = pulled.slice(reportedUpTo, upTo);
     if (!fresh.length) return;
-    reportedUpTo = pulled.length;
+    reportInFlight = true;
     try {
       const valued = await valueCards(fresh);
-      await rpc('wm_agent_pulls', { p_user: cloudAuth.user, p_pass: cloudAuth.pass, p_pulls: valued });
-    } catch (e) {}
+      const r = await rpc('wm_agent_pulls', { p_user: cloudAuth.user, p_pass: cloudAuth.pass, p_pulls: valued });
+      // Les cartes ne sont marquées « envoyées » que si le serveur les a bien reçues :
+      // en cas de coupure réseau, elles repartent au prochain essai.
+      if (r && r.ok) reportedUpTo = upTo;
+    } catch (e) {} finally { reportInFlight = false; }
   };
   var cloudReportPulls = window.cloudReportPulls;
 
@@ -716,6 +722,7 @@ ${isAdmin ? `
       batchMode = r.batch; $('wm-batch').checked = batchMode;
       try { localStorage.setItem('wm-batch', batchMode ? '1' : '0'); } catch (e) {}
     }
+    if (reportedUpTo < pulled.length) cloudReportPulls();
     if (r.desired === 'run' && !location.pathname.startsWith('/pulls')) { location.href = '/pulls'; return; }
     if (r.desired === 'run' && !packsRunning) setRunning(true, true);
     if (r.desired === 'stop' && packsRunning) { setRunning(false, true); cloudReportPulls(); }
